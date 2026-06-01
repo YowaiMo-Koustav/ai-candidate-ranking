@@ -16,6 +16,79 @@ Recruiters go through hundreds of profiles and still often miss the right person
 
 ---
 
+## ⚡ Quick Start (Reproduce Submission)
+
+Follow these steps to reproduce the final submission exactly according to the hackathon specifications.
+
+### 1. Environment Setup
+
+Create a Python 3.9+ virtual environment and install the required dependencies:
+
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 2. Place Official Bundle Files
+
+Ensure the official hackathon data bundle is extracted directly into the `data/raw/` directory. Your `data/raw/` folder must contain these exact files:
+
+- `candidates.jsonl`
+- `job_description.docx`
+- `candidate_schema.json`
+- `redrob_signals_doc.docx`
+- `submission_spec.docx`
+- `sample_candidates.json`
+- `validate_submission.py`
+- `submission_metadata_template.yaml`
+- `sample_submission.csv`
+
+### 3. Step 1: Offline Precomputation
+
+Before running the final inference, we must precompute the heavy feature engineering and `sentence-transformer` embeddings. 
+*(Note: This step can take 20–40 minutes depending on hardware, but it runs **offline** and is exempt from the 5-minute inference budget).*
+
+```bash
+python -m src.precompute
+```
+This generates `embeddings.npy`, `candidate_ids.npy`, and `candidates_feather.parquet` in the `data/processed/` directory.
+
+### 4. Step 2: Fast CPU Inference
+
+Run the final ranking pipeline. This step respects the **strict 5-minute, CPU-only, 16GB RAM, no-network constraint** by loading the pre-downloaded model cache and the precomputed artifacts from `data/processed/`.
+
+```bash
+python -m src.inference \
+  --candidates data/raw/candidates.jsonl \
+  --job-desc data/raw/job_description.docx \
+  --out outputs/submissions/TEAM_ID.csv
+```
+
+### 5. Validate Submission
+
+Verify that the final output perfectly matches the hackathon CSV specifications and schema:
+
+```bash
+python data/raw/validate_submission.py outputs/submissions/TEAM_ID.csv
+```
+
+---
+
+## 🚀 Interactive Streamlit Sandbox
+
+Want to test the pipeline interactively on a small subset of candidates? We built a Streamlit app to visualize the ranking logic instantly.
+
+```bash
+streamlit run src/sandbox_app.py
+```
+
+- **Dynamic Job Description**: Edit the JD text on the fly.
+- **Sub-Second Inference**: Ranks the cached candidates instantly against your custom JD.
+- **Explainability**: View clear, human-readable reasonings for the top 20 candidates.
+
+---
+
 ## 🧠 Hybrid Candidate Ranking Pipeline
 
 We combine state-of-the-art NLP with hard-coded recruiter heuristics:
@@ -34,90 +107,6 @@ We combine state-of-the-art NLP with hard-coded recruiter heuristics:
 
 ---
 
-## 🏗️ Project Architecture
-
-```
-ai-candidate-ranking/
-├── README.md                          # This file
-├── requirements.txt                   # Python dependencies
-├── submission_metadata.yaml           # Hackathon metadata
-├── validate_submission.py             # Hackathon format validator script
-├── configs/
-│   └── config.yaml                    # Central configuration
-├── data/
-│   ├── raw/                           # Original unmodified data (e.g., job_description.docx, candidates.jsonl)
-│   ├── processed/                     # Precomputed artifacts (embeddings.npy, candidates_feather.parquet)
-│   └── sample/                        # Small sample for quick local testing (small_candidates.jsonl)
-├── notebooks/
-│   ├── 01_eda.ipynb                   # Exploratory Data Analysis & Honeypot Identification
-│   ├── 02_pipeline_dev.ipynb          # Pipeline development & Offline 100k Batch Precomputation
-│   └── 03_inference_submission.ipynb  # Final 5-minute CPU Inference & CSV generation
-├── src/
-│   ├── __init__.py                    
-│   ├── data_loader.py                 # Lazy-loading JSON streams & JD parsing
-│   ├── embeddings.py                  # Text aggregration & sentence-transformers logic
-│   ├── features.py                    # 15+ Recruiter feature engineering heuristics
-│   ├── scoring.py                     # Weighted scoring fusion & explanation generator
-│   └── sandbox_app.py                 # Interactive Streamlit testing sandbox
-└── outputs/
-    └── submissions/                   # Final ranked_candidates.csv output
-```
-
----
-
-## ⚙️ Setup Instructions
-
-### Prerequisites
-- Python 3.9+
-- `pip`
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/YowaiMo-Koustav/ai-candidate-ranking.git
-cd ai-candidate-ranking
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
----
-
-## 🚀 Interactive Streamlit Sandbox
-
-Want to test the pipeline on a small subset of candidates instantly? We built a Streamlit app to interact with the pipeline.
-
-```bash
-streamlit run src/sandbox_app.py
-```
-
-- **Dynamic Job Description**: Edit the JD text on the fly.
-- **Sub-Second Inference**: Ranks the cached candidates instantly against your custom JD.
-- **Explainability**: View clear, human-readable reasonings for the top 20 candidates.
-
----
-
-## 🔄 Execution Workflow for the Hackathon
-
-The processing is split into two phases to adhere to the hackathon's compute constraints:
-
-### 1. Offline Batch Precomputation (`02_pipeline_dev.ipynb`)
-- Streams all 100,000 candidates using lazy loading to prevent out-of-memory errors.
-- Computes all structured features (experience bands, skill depth, notice penalties).
-- Embeds all candidate text using `sentence-transformers`.
-- Saves cached artifacts to `data/processed/` (`.npy` and `.parquet`).
-
-### 2. Fast CPU Inference (`03_inference_submission.ipynb`)
-- **Strict 5-minute constraint**.
-- Runs completely offline without external network calls (model is loaded from cache).
-- Loads cached `.parquet` and `.npy` artifacts instantly.
-- Generates JD embedding and runs lightning-fast matrix multiplication for cosine similarities.
-- Applies final weighting, filters honeypots, dynamically generates text reasonings for the Top 100, and exports `ranked_candidates.csv`.
-- Runs `validate_submission.py` to ensure perfect format compliance.
-
----
-
 ## 📊 Feature Engineering Highlights
 
 We built 15+ complex features directly reflecting actual recruitment parameters:
@@ -126,6 +115,39 @@ We built 15+ complex features directly reflecting actual recruitment parameters:
 - **Experience Band Match**: Peaks around 6-8 years to target senior talent without favoring massive unrelated histories.
 - **Behavioral Signals**: Leverages Redrob data like `recruiter_response_rate` and `last_active_date`.
 - **Honeypot Penalty**: Strictly penalizes candidates with 15+ AI skills but less than 1 year of estimated ML working experience.
+
+---
+
+## 🏗️ Project Architecture
+
+```
+ai-candidate-ranking/
+├── README.md                          
+├── requirements.txt                   
+├── submission_metadata.yaml           
+├── validate_submission.py             
+├── configs/
+│   └── config.yaml                    
+├── data/
+│   ├── raw/                           # Official hackathon bundle files
+│   ├── processed/                     # Precomputed artifacts
+│   └── sample/                        # Small sample for local testing
+├── notebooks/
+│   ├── 01_eda.ipynb                   
+│   ├── 02_pipeline_dev.ipynb          
+│   └── 03_inference_submission.ipynb  
+├── src/
+│   ├── __init__.py                    
+│   ├── data_loader.py                 # Lazy-loading JSON streams & JD parsing
+│   ├── embeddings.py                  # Text aggregration & sentence-transformers logic
+│   ├── features.py                    # Recruiter feature engineering heuristics
+│   ├── scoring.py                     # Weighted scoring fusion & explanation generator
+│   ├── precompute.py                  # CLI entrypoint for batch precomputation
+│   ├── inference.py                   # CLI entrypoint for fast CPU inference
+│   └── sandbox_app.py                 # Interactive Streamlit testing sandbox
+└── outputs/
+    └── submissions/                   # Final ranked CSV outputs
+```
 
 ---
 
