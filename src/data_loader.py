@@ -1,136 +1,49 @@
-"""
-data_loader.py — Load candidate and job data from various formats.
+import json
+from docx import Document
 
-This module handles all data I/O. When the actual dataset arrives,
-update the column names in configs/config.yaml and the loading logic here.
-"""
-
-import pandas as pd
-import yaml
-import os
-
-
-def load_config(config_path="configs/config.yaml"):
+def load_candidates(path, limit=None):
     """
-    Load the central YAML configuration file.
-
-    Args:
-        config_path (str): Path to the config file.
-
-    Returns:
-        dict: Parsed configuration dictionary.
+    Generator to yield candidate dicts line by line from JSONL.
     """
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    return config
+    count = 0
+    
+    # Handle sample fallback array if needed
+    is_json_array = False
+    try:
+        with open(path, 'r', encoding="utf-8") as f:
+            first_char = f.read(1)
+        is_json_array = (first_char == '[')
+    except Exception:
+        pass
 
-
-def load_candidates(config):
-    """
-    Load candidate data from the raw data directory.
-
-    Args:
-        config (dict): Configuration dictionary (from load_config).
-
-    Returns:
-        pd.DataFrame: Candidate profiles dataframe.
-
-    Example:
-        >>> config = load_config()
-        >>> candidates = load_candidates(config)
-        >>> print(candidates.shape)
-    """
-    filepath = os.path.join(
-        config["paths"]["raw_data"],
-        config["dataset"]["candidates_file"]
-    )
-
-    # Auto-detect format by extension
-    if filepath.endswith(".csv"):
-        df = pd.read_csv(filepath)
-    elif filepath.endswith(".json"):
-        df = pd.read_json(filepath)
-    elif filepath.endswith(".xlsx"):
-        df = pd.read_excel(filepath)
+    if is_json_array:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            for cand in data:
+                yield cand
+                count += 1
+                if limit and count >= limit:
+                    break
     else:
-        raise ValueError(f"Unsupported file format: {filepath}")
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                yield json.loads(line)
+                count += 1
+                if limit and count >= limit:
+                    break
 
-    print(f"✅ Loaded {len(df)} candidates from {filepath}")
-    return df
-
-
-def load_jobs(config):
+def build_jd_text(docx_path):
     """
-    Load job descriptions from the raw data directory.
-
-    Args:
-        config (dict): Configuration dictionary (from load_config).
-
-    Returns:
-        pd.DataFrame: Job descriptions dataframe.
-
-    Example:
-        >>> config = load_config()
-        >>> jobs = load_jobs(config)
-        >>> print(jobs.shape)
-    """
-    filepath = os.path.join(
-        config["paths"]["raw_data"],
-        config["dataset"]["jobs_file"]
-    )
-
-    if filepath.endswith(".csv"):
-        df = pd.read_csv(filepath)
-    elif filepath.endswith(".json"):
-        df = pd.read_json(filepath)
-    elif filepath.endswith(".xlsx"):
-        df = pd.read_excel(filepath)
-    else:
-        raise ValueError(f"Unsupported file format: {filepath}")
-
-    print(f"✅ Loaded {len(df)} job descriptions from {filepath}")
-    return df
-
-
-def load_single_jd(jd_text):
-    """
-    Create a job dataframe from a single JD string (for quick testing).
-
-    Args:
-        jd_text (str): Raw job description text.
-
-    Returns:
-        pd.DataFrame: Single-row dataframe with the JD.
-
-    Example:
-        >>> jd = "Looking for a senior ML engineer with 5+ years experience..."
-        >>> jobs = load_single_jd(jd)
-    """
-    return pd.DataFrame([{
-        "job_id": "manual_001",
-        "job_title": "Manual Entry",
-        "job_description": jd_text,
-        "required_skills": "",
-        "min_experience": 0
-    }])
-
-
-def get_column(config, section, key):
-    """
-    Safely get a column name from config, with a helpful error if missing.
-
-    Args:
-        config (dict): Configuration dictionary.
-        section (str): Either "candidate_columns" or "job_columns".
-        key (str): The logical column name (e.g., "resume_text").
-
-    Returns:
-        str: The actual column name in the dataset.
+    Loads the JD and extracts critical sections to form a concise query string.
     """
     try:
-        return config["dataset"][section][key]
-    except KeyError:
-        raise KeyError(
-            f"Column '{key}' not found in config['dataset']['{section}']. "
-            f"Please update configs/config.yaml with your dataset's column names."
-        )
+        doc = Document(docx_path)
+        paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+        full_text = "\n".join(paragraphs)
+        return full_text
+    except Exception as e:
+        print(f"Error reading JD: {e}")
+        return ""

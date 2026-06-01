@@ -1,0 +1,10 @@
+team_name: "Your Team Name"
+team_members:
+  - "Member 1"
+  - "Member 2"
+model_description: "Describe your model here (e.g., SentenceTransformers + XGBoost)"
+features_used:
+  - "semantic_similarity"
+  - "skill_overlap"
+  - "experience_match"
+external_data_used: false
