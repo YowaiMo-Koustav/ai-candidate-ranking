@@ -1,160 +1,306 @@
 # 🎯 Redrob Intelligent Candidate Discovery & Ranking
 
-> **Hackathon Project** — An AI system that ranks candidates the way a great recruiter would — not by matching keywords, but by actually understanding who fits the role, predicting reliability, and penalizing keyword-stuffing honeypots.
+> **Hackathon Submission** — An AI-powered candidate ranking system that thinks like a recruiter: semantic understanding of job fit, structured evaluation of experience & behavioral signals, and built-in honeypot detection — all within a strict **5-minute CPU-only compute budget**.
 
 ---
 
-## 📌 Problem Overview
+## 📌 Problem Statement
 
-Recruiters go through hundreds of profiles and still often miss the right person. Not because the talent isn't there — but because pure keyword filters can't see what actually matters, and LLM evaluations are often too slow or prone to hallucinations.
+Given a single Job Description (Senior AI Engineer — Founding Team at Redrob AI) and **100,000 candidate profiles** in JSONL format, produce a **ranked top-100 CSV** scored on relevance. The system must:
 
-**Goal:** Build a robust, scalable AI system that:
-1. Understands semantic meaning behind a Job Description (JD).
-2. Analyzes candidate profiles holistically (skills, experience, trajectory, redrob behavioral signals).
-3. Weeds out spam/honeypot candidates with impossible timelines.
-4. Produces a ranked shortlist with human-readable explanations—all within a strict 5-minute CPU-only compute budget constraint.
+- Run the final ranking step on **CPU-only, 16 GB RAM, no network access**, under **5 minutes**.
+- Generate **unique, human-readable reasoning** for every ranked candidate.
+- Detect and demote **~80 honeypot candidates** (subtly impossible profiles).
+- Produce a submission matching the exact CSV spec: `candidate_id, job_id, rank, score, reasoning`.
 
 ---
 
-## ⚡ Quick Start (Reproduce Submission)
+## ⚡ Quick Start — Reproduce the Submission
 
-Follow these steps to reproduce the final submission exactly according to the hackathon specifications.
-
-### 1. Environment Setup
-
-Create a Python 3.9+ virtual environment and install the required dependencies:
+### 1. Clone & Setup
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
+git clone https://github.com/YowaiMo-Koustav/ai-candidate-ranking.git
+cd ai-candidate-ranking
+
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Place Official Bundle Files
+### 2. Place Official Data Bundle
 
-Ensure the official hackathon data bundle is extracted directly into the `data/raw/` directory. Your `data/raw/` folder must contain these exact files:
+Extract the hackathon data into `data/raw/`:
 
-- `candidates.jsonl`
-- `job_description.docx`
-- `candidate_schema.json`
-- `redrob_signals_doc.docx`
-- `submission_spec.docx`
-- `sample_candidates.json`
-- `validate_submission.py`
-- `submission_metadata_template.yaml`
-- `sample_submission.csv`
+```
+data/raw/
+├── candidates.jsonl                 # 100,000 candidate profiles
+├── job_description.docx             # The target JD
+├── candidate_schema.json            # JSON schema for candidate format
+├── redrob_signals_doc.docx          # Documentation of behavioral signals
+├── submission_spec.docx             # Submission format specification
+├── sample_candidates.json           # 50 sample candidates for testing
+├── validate_submission.py           # Official submission validator
+├── submission_metadata_template.yaml
+└── sample_submission.csv            # Format reference
+```
 
-### 3. Step 1: Offline Precomputation
+### 3. Step 1 — Offline Precomputation (one-time)
 
-Before running the final inference, we must precompute the heavy feature engineering and `sentence-transformer` embeddings. 
-*(Note: This step can take 20–40 minutes depending on hardware, but it runs **offline** and is exempt from the 5-minute inference budget).*
+This step streams all 100k candidates, engineers features, and encodes embeddings.  
+**Not subject to the 5-minute budget** — runs once before inference.
 
 ```bash
 python -m src.precompute
 ```
-This generates `embeddings.npy`, `candidate_ids.npy`, and `candidates_feather.parquet` in the `data/processed/` directory.
 
-### 4. Step 2: Fast CPU Inference
+Generates three artifacts in `data/processed/`:
+| File | Contents | Size |
+|------|----------|------|
+| `embeddings.npy` | 100k × 384 sentence-transformer vectors | ~146 MB |
+| `candidate_ids.npy` | Ordered candidate ID array | ~4.6 MB |
+| `candidates_feather.parquet` | 15 engineered features per candidate | ~1.6 MB |
 
-Run the final ranking pipeline. This step respects the **strict 5-minute, CPU-only, 16GB RAM, no-network constraint** by loading the pre-downloaded model cache and the precomputed artifacts from `data/processed/`.
+### 4. Step 2 — Fast CPU Inference (under 5 min)
+
+Loads precomputed artifacts, encodes the JD, computes similarity, scores, ranks, and writes the final CSV.
 
 ```bash
 python -m src.inference \
   --candidates data/raw/candidates.jsonl \
   --job-desc data/raw/job_description.docx \
-  --out outputs/submissions/TEAM_ID.csv
+  --out outputs/submissions/ranked_candidates.csv
 ```
 
-### 5. Validate Submission
+**CLI Arguments** (all have sensible defaults):
 
-Verify that the final output perfectly matches the hackathon CSV specifications and schema:
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--candidates` | `data/raw/candidates.jsonl` | Path to candidates JSONL |
+| `--job-desc` | `data/raw/job_description.docx` | Path to job description |
+| `--embeddings` | `data/processed/embeddings.npy` | Precomputed embeddings |
+| `--candidate-ids` | `data/processed/candidate_ids.npy` | Candidate ID mapping |
+| `--features` | `data/processed/candidates_feather.parquet` | Feature matrix |
+| `--out` | `outputs/submissions/ranked_candidates.csv` | Output CSV path |
+| `--top-k` | `100` | Number of candidates to rank |
+
+### 5. Validate
 
 ```bash
-python data/raw/validate_submission.py outputs/submissions/TEAM_ID.csv
+python data/raw/validate_submission.py \
+  outputs/submissions/ranked_candidates.csv \
+  submission_metadata.yaml
 ```
+
+Expected output: `Validation successful!`
 
 ---
 
-## 🚀 Interactive Streamlit Sandbox
+## 🚀 Interactive Sandbox (Streamlit)
 
-Want to test the pipeline interactively on a small subset of candidates? We built a Streamlit app to visualize the ranking logic instantly.
+A lightweight demo that lets you test the ranking pipeline interactively.
 
 ```bash
 streamlit run src/sandbox_app.py
 ```
 
-- **Dynamic Job Description**: Edit the JD text on the fly.
-- **Sub-Second Inference**: Ranks the cached candidates instantly against your custom JD.
-- **Explainability**: View clear, human-readable reasonings for the top 20 candidates.
+- **Edit the JD** on-the-fly via a text area
+- **Instant re-ranking** of a small candidate subset
+- **See reasoning** for the top 20 candidates
+- **Download** results as CSV
 
 ---
 
-## 🧠 Hybrid Candidate Ranking Pipeline
+## 🧠 System Architecture
 
-We combine state-of-the-art NLP with hard-coded recruiter heuristics:
+### Two-Phase Pipeline
 
-| Layer | What it does | How |
-|-------|-------------|-----|
-| **Semantic Matching** | Understands meaning beyond keywords | `sentence-transformers/all-MiniLM-L6-v2` embeddings + cosine similarity |
-| **Structured Scoring** | Captures recruiter-like heuristics | Feature engineering on experience, skills overlap, geo-fit, and behavioral signals |
-| **Honeypot Filtering** | Catches spam/fake profiles | Heuristics targeting impossible experience timelines and skill keyword-stuffing |
-| **Explainability** | Builds trust with the recruiter | Dynamic text generation combining metrics to explain *why* a candidate ranked highly |
+```
+Phase 1: Offline Precomputation (no time limit)
+┌──────────────┐    ┌──────────────────┐    ┌────────────────┐
+│  candidates   │───▶│  Feature Engine   │───▶│  embeddings.npy│
+│  .jsonl       │    │  15 heuristics   │    │  features.pqt  │
+│  (100k)       │    │  + text builder  │    │  ids.npy       │
+└──────────────┘    └──────────────────┘    └────────────────┘
+                           ▲
+                    sentence-transformers
+                    all-MiniLM-L6-v2
 
-### Why Hybrid?
-- Pure keyword matching misses semantically equivalent skills.
-- Pure embedding similarity ignores hard requirements (years of experience, redrob responsiveness scores).
-- A Hybrid approach mimics how a skilled recruiter actually thinks while remaining fully transparent.
+Phase 2: Fast Inference (< 5 min, CPU-only)
+┌────────────────┐    ┌────────────┐    ┌──────────────┐    ┌─────────┐
+│ Load artifacts │───▶│ Encode JD  │───▶│ Score + Rank │───▶│ CSV out │
+│ (< 3 sec)      │    │ + cosine   │    │ + reasoning  │    │ top 100 │
+└────────────────┘    └────────────┘    └──────────────┘    └─────────┘
+```
+
+### Hybrid Scoring Model
+
+We combine **semantic NLP** with **recruiter-domain heuristics** into a single weighted score:
+
+| Component | Weight | Signal Source |
+|-----------|--------|---------------|
+| **Semantic Similarity** | 35% | Cosine similarity between JD and candidate text embeddings |
+| **Role Title Fit** | 10% | Regex match against ML/AI/Search title patterns |
+| **Product Company Affinity** | 10% | Penalizes pure IT services backgrounds (Infosys, TCS, Wipro) |
+| **Experience Band Match** | 10% | Peaks at 6–8 years (JD requirement), tapers outside |
+| **ML Years Estimate** | 10% | Actual time spent in ML-titled roles from career history |
+| **AI Skill Depth** | 5% | Proficiency × duration weighted score across AI skills |
+| **Availability** | 5% | Open-to-work flag, recency, recruiter response rate |
+| **Reliability** | 5% | Interview completion rate, verification status |
+| **GitHub Activity** | 5% | Normalized GitHub activity score (0–100 → 0–1) |
+| **Geo Fit** | 3% | Pune/Noida = 1.0, India = 0.8, US/UK = 0.2 |
+| **Work Mode Fit** | 2% | Hybrid/flexible preference alignment |
+
+**Penalties applied after scoring:**
+
+| Penalty | Scale | Trigger |
+|---------|-------|---------|
+| Notice Period | α = 0.5 | > 30 days notice period |
+| Honeypot Risk | β = 1.0 | Impossible experience/skill patterns |
+
+Final score = `clip(weighted_sum − penalties, 0, 1)`
 
 ---
 
-## 📊 Feature Engineering Highlights
+## 🕵️ Honeypot Detection
 
-We built 15+ complex features directly reflecting actual recruitment parameters:
-- **Role Title Score**: Prioritizes explicit ML/AI/Search titles.
-- **Product Company Affinity**: Penalizes candidates deeply rooted in pure IT services unless they have explicit product ML roles.
-- **Experience Band Match**: Peaks around 6-8 years to target senior talent without favoring massive unrelated histories.
-- **Behavioral Signals**: Leverages Redrob data like `recruiter_response_rate` and `last_active_date`.
-- **Honeypot Penalty**: Strictly penalizes candidates with 15+ AI skills but less than 1 year of estimated ML working experience.
+The dataset contains ~80 synthetic candidates with subtly impossible profiles. Our detection flags three patterns:
+
+1. **Timeline Mismatch** — Claimed career history years exceed stated YOE by 3+ years (or vice versa)
+2. **Skill Stuffing** — "Expert"/"Advanced" proficiency in AI skills with ≤ 1 month of declared duration
+3. **Skills vs Experience Gap** — 10+ AI/ML skills listed but < 0.5 years of actual ML role tenure
+
+Candidates with `honeypot_risk_score ≥ 0.6` are **excluded** from the final top-100.
 
 ---
 
-## 🏗️ Project Architecture
+## 📊 Engineered Features (15 total)
+
+| Feature | Range | Description |
+|---------|-------|-------------|
+| `role_title_score` | [-0.5, 1.0] | ML/AI title match; negative for marketing/HR |
+| `product_company_score` | [0, 0.8] | Product/tech vs IT services background |
+| `total_years_experience` | continuous | From `profile.years_of_experience` |
+| `experience_band_match` | [0.2, 1.0] | Peak at 6–8 yrs per JD spec |
+| `ml_years_estimate` | continuous | Calculated from career_history titles + dates |
+| `ai_core_skills_count` | integer | Count of AI-pattern-matching skills |
+| `ai_skill_depth_score` | continuous | Weighted by proficiency × duration |
+| `availability_score` | [0, 1] | Composite of open_to_work, recency, response rate |
+| `reliability_score` | [0, 1] | Interview completion, offer acceptance, verification |
+| `github_fit_score` | [0, 1] | Normalized from 0–100 scale |
+| `geo_fit_score` | [0.2, 1.0] | Location preference for Pune/Noida/India |
+| `work_mode_fit` | {0.5, 1.0} | Hybrid/flexible = 1.0 |
+| `notice_period_penalty` | [0, 1] | Escalates past 30 days |
+| `honeypot_risk_score` | [0, 1] | Composite of 3 honeypot detectors |
+| `semantic_similarity` | [0, 1] | Cosine sim (computed at inference time) |
+
+---
+
+## 🏗️ Project Structure
 
 ```
 ai-candidate-ranking/
-├── README.md                          
-├── requirements.txt                   
-├── submission_metadata.yaml           
-├── validate_submission.py             
+├── README.md                           # This file
+├── requirements.txt                    # Python dependencies
+├── submission_metadata.yaml            # Hackathon submission metadata
+│
 ├── configs/
-│   └── config.yaml                    
+│   └── config.yaml                     # Centralized configuration
+│
 ├── data/
-│   ├── raw/                           # Official hackathon bundle files
-│   ├── processed/                     # Precomputed artifacts
-│   └── sample/                        # Small sample for local testing
+│   ├── raw/                            # Official hackathon data bundle
+│   ├── processed/                      # Precomputed artifacts (generated)
+│   │   ├── embeddings.npy              #   100k × 384 embeddings
+│   │   ├── candidate_ids.npy           #   Ordered ID array
+│   │   └── candidates_feather.parquet  #   15-column feature matrix
+│   └── sample/
+│       └── small_candidates.jsonl      # Small subset for sandbox testing
+│
 ├── notebooks/
-│   ├── 01_eda.ipynb                   
-│   ├── 02_pipeline_dev.ipynb          
-│   └── 03_inference_submission.ipynb  
+│   ├── 01_eda.ipynb                    # Exploratory data analysis
+│   ├── 02_pipeline_dev.ipynb           # Feature engineering & dev pipeline
+│   └── 03_inference_submission.ipynb   # Final inference & validated CSV
+│
 ├── src/
-│   ├── __init__.py                    
-│   ├── data_loader.py                 # Lazy-loading JSON streams & JD parsing
-│   ├── embeddings.py                  # Text aggregration & sentence-transformers logic
-│   ├── features.py                    # Recruiter feature engineering heuristics
-│   ├── scoring.py                     # Weighted scoring fusion & explanation generator
-│   ├── precompute.py                  # CLI entrypoint for batch precomputation
-│   ├── inference.py                   # CLI entrypoint for fast CPU inference
-│   └── sandbox_app.py                 # Interactive Streamlit testing sandbox
+│   ├── __init__.py
+│   ├── data_loader.py                  # JSONL streaming & JD parsing
+│   ├── embeddings.py                   # Text builder & sentence-transformers
+│   ├── features.py                     # 15 recruiter-domain feature functions
+│   ├── scoring.py                      # Weighted scoring fusion & reasoning
+│   ├── precompute.py                   # CLI: batch precompute (Step 1)
+│   ├── inference.py                    # CLI: fast CPU inference (Step 2)
+│   └── sandbox_app.py                  # Streamlit interactive demo
+│
 └── outputs/
-    └── submissions/                   # Final ranked CSV outputs
+    └── submissions/
+        └── ranked_candidates.csv       # Final submission CSV
 ```
 
 ---
 
-## 📝 License
+## 📓 Notebooks
 
-Built for the Redrob Intelligent Candidate Discovery & Ranking Challenge.
+| Notebook | Purpose | Key Outputs |
+|----------|---------|-------------|
+| **01_eda** | Explores the JD, schema, signals, and sample candidates. Identifies feature ideas and honeypot patterns. | Feature hypotheses |
+| **02_pipeline_dev** | Develops and tests the full feature engineering pipeline on a 5k dev subset. Runs full 100k precomputation. | `data/processed/*` artifacts |
+| **03_inference** | Loads precomputed artifacts, scores all candidates, generates reasoning, writes submission CSV, and runs the official validator. | `ranked_candidates.csv` ✅ |
 
 ---
 
-*Built with ❤️ for better hiring.*
+## 🔧 Technical Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **all-MiniLM-L6-v2** (22M params) | Fast enough for 100k candidates on CPU; 384-dim embeddings keep cosine sim fast |
+| **No LLM calls** | Budget constraint: 5 min for 100k candidates rules out per-candidate LLM evaluation |
+| **Precompute/inference split** | Embedding 100k candidates takes ~15 min — do it offline, then inference is < 30 seconds |
+| **Heuristic scoring (no ML model)** | No labeled training data (no recruiter decisions to learn from), so hand-tuned weights |
+| **Honeypot penalty, not filter** | Soft penalty preserves borderline candidates while strongly demoting obvious fakes |
+
+---
+
+## 📝 Submission Metadata
+
+Update `submission_metadata.yaml` before submitting:
+
+```yaml
+team_name: "Your Team Name"
+team_members:
+  - "Member 1"
+model_description: "Sentence-Transformers (all-MiniLM-L6-v2) + 15 hand-engineered recruiter-domain features with weighted heuristic scoring"
+features_used:
+  - "semantic_similarity"
+  - "role_title_score"
+  - "product_company_score"
+  - "experience_band_match"
+  - "ml_years_estimate"
+  - "ai_skill_depth_score"
+  - "availability_score"
+  - "reliability_score"
+  - "github_fit_score"
+  - "geo_fit_score"
+  - "work_mode_fit"
+  - "notice_period_penalty"
+  - "honeypot_risk_score"
+external_data_used: false
+```
+
+---
+
+## 📋 Submission Checklist
+
+- [x] Exactly 100 rows
+- [x] Columns: `candidate_id`, `job_id`, `rank`, `score`, `reasoning`
+- [x] Ranks 1–100, starting at 1
+- [x] Scores monotonically non-increasing
+- [x] No duplicate candidate IDs
+- [x] All candidate IDs exist in `candidates.jsonl`
+- [x] Unique, specific reasoning per candidate (no templates)
+- [x] No honeypots in top 10
+- [x] Inference completes in < 5 minutes on CPU
+- [x] `validate_submission.py` passes ✅
+
+---
+
+*Built with ❤️ for better hiring — Redrob Intelligent Candidate Discovery & Ranking Challenge*
