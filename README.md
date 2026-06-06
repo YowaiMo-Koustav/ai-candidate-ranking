@@ -36,13 +36,7 @@ Extract the hackathon data into `data/raw/`:
 data/raw/
 ├── candidates.jsonl                 # 100,000 candidate profiles
 ├── job_description.docx             # The target JD
-├── candidate_schema.json            # JSON schema for candidate format
-├── redrob_signals_doc.docx          # Documentation of behavioral signals
-├── submission_spec.docx             # Submission format specification
-├── sample_candidates.json           # 50 sample candidates for testing
 ├── validate_submission.py           # Official submission validator
-├── submission_metadata_template.yaml
-└── sample_submission.csv            # Format reference
 ```
 
 ### 3. Step 1 — Offline Precomputation (one-time)
@@ -74,15 +68,15 @@ python -m src.inference \
 
 **CLI Arguments** (all have sensible defaults):
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--candidates` | `data/raw/candidates.jsonl` | Path to candidates JSONL |
-| `--job-desc` | `data/raw/job_description.docx` | Path to job description |
-| `--embeddings` | `data/processed/embeddings.npy` | Precomputed embeddings |
-| `--candidate-ids` | `data/processed/candidate_ids.npy` | Candidate ID mapping |
-| `--features` | `data/processed/candidates_feather.parquet` | Feature matrix |
-| `--out` | `outputs/submissions/ranked_candidates.csv` | Output CSV path |
-| `--top-k` | `100` | Number of candidates to rank |
+| Flag              | Default                                     | Description                  |
+| ----------------- | ------------------------------------------- | ---------------------------- |
+| `--candidates`    | `data/raw/candidates.jsonl`                 | Path to candidates JSONL     |
+| `--job-desc`      | `data/raw/job_description.docx`             | Path to job description      |
+| `--embeddings`    | `data/processed/embeddings.npy`             | Precomputed embeddings       |
+| `--candidate-ids` | `data/processed/candidate_ids.npy`          | Candidate ID mapping         |
+| `--features`      | `data/processed/candidates_feather.parquet` | Feature matrix               |
+| `--out`           | `outputs/submissions/ranked_candidates.csv` | Output CSV path              |
+| `--top-k`         | `100`                                       | Number of candidates to rank |
 
 ### 5. Validate
 
@@ -137,25 +131,25 @@ Phase 2: Fast Inference (< 5 min, CPU-only)
 
 We combine **semantic NLP** with **recruiter-domain heuristics** into a single weighted score:
 
-| Component | Weight | Signal Source |
-|-----------|--------|---------------|
-| **Semantic Similarity** | 35% | Cosine similarity between JD and candidate text embeddings |
-| **Role Title Fit** | 10% | Regex match against ML/AI/Search title patterns |
-| **Product Company Affinity** | 10% | Penalizes pure IT services backgrounds (Infosys, TCS, Wipro) |
-| **Experience Band Match** | 10% | Peaks at 6–8 years (JD requirement), tapers outside |
-| **ML Years Estimate** | 10% | Actual time spent in ML-titled roles from career history |
-| **AI Skill Depth** | 5% | Proficiency × duration weighted score across AI skills |
-| **Availability** | 5% | Open-to-work flag, recency, recruiter response rate |
-| **Reliability** | 5% | Interview completion rate, verification status |
-| **GitHub Activity** | 5% | Normalized GitHub activity score (0–100 → 0–1) |
-| **Geo Fit** | 3% | Pune/Noida = 1.0, India = 0.8, US/UK = 0.2 |
-| **Work Mode Fit** | 2% | Hybrid/flexible preference alignment |
+| Component                    | Weight | Signal Source                                                |
+| ---------------------------- | ------ | ------------------------------------------------------------ |
+| **Semantic Similarity**      | 35%    | Cosine similarity between JD and candidate text embeddings   |
+| **Role Title Fit**           | 10%    | Regex match against ML/AI/Search title patterns              |
+| **Product Company Affinity** | 10%    | Penalizes pure IT services backgrounds (Infosys, TCS, Wipro) |
+| **Experience Band Match**    | 10%    | Peaks at 6–8 years (JD requirement), tapers outside          |
+| **ML Years Estimate**        | 10%    | Actual time spent in ML-titled roles from career history     |
+| **AI Skill Depth**           | 5%     | Proficiency × duration weighted score across AI skills       |
+| **Availability**             | 5%     | Open-to-work flag, recency, recruiter response rate          |
+| **Reliability**              | 5%     | Interview completion rate, verification status               |
+| **GitHub Activity**          | 5%     | Normalized GitHub activity score (0–100 → 0–1)               |
+| **Geo Fit**                  | 3%     | Pune/Noida = 1.0, India = 0.8, US/UK = 0.2                   |
+| **Work Mode Fit**            | 2%     | Hybrid/flexible preference alignment                         |
 
 **Penalties applied after scoring:**
 
-| Penalty | Scale | Trigger |
-|---------|-------|---------|
-| Notice Period | α = 0.5 | > 30 days notice period |
+| Penalty       | Scale   | Trigger                              |
+| ------------- | ------- | ------------------------------------ |
+| Notice Period | α = 0.5 | > 30 days notice period              |
 | Honeypot Risk | β = 1.0 | Impossible experience/skill patterns |
 
 Final score = `clip(weighted_sum − penalties, 0, 1)`
@@ -176,23 +170,23 @@ Candidates with `honeypot_risk_score ≥ 0.6` are **excluded** from the final to
 
 ## 📊 Engineered Features (15 total)
 
-| Feature | Range | Description |
-|---------|-------|-------------|
-| `role_title_score` | [-0.5, 1.0] | ML/AI title match; negative for marketing/HR |
-| `product_company_score` | [0, 0.8] | Product/tech vs IT services background |
-| `total_years_experience` | continuous | From `profile.years_of_experience` |
-| `experience_band_match` | [0.2, 1.0] | Peak at 6–8 yrs per JD spec |
-| `ml_years_estimate` | continuous | Calculated from career_history titles + dates |
-| `ai_core_skills_count` | integer | Count of AI-pattern-matching skills |
-| `ai_skill_depth_score` | continuous | Weighted by proficiency × duration |
-| `availability_score` | [0, 1] | Composite of open_to_work, recency, response rate |
-| `reliability_score` | [0, 1] | Interview completion, offer acceptance, verification |
-| `github_fit_score` | [0, 1] | Normalized from 0–100 scale |
-| `geo_fit_score` | [0.2, 1.0] | Location preference for Pune/Noida/India |
-| `work_mode_fit` | {0.5, 1.0} | Hybrid/flexible = 1.0 |
-| `notice_period_penalty` | [0, 1] | Escalates past 30 days |
-| `honeypot_risk_score` | [0, 1] | Composite of 3 honeypot detectors |
-| `semantic_similarity` | [0, 1] | Cosine sim (computed at inference time) |
+| Feature                  | Range       | Description                                          |
+| ------------------------ | ----------- | ---------------------------------------------------- |
+| `role_title_score`       | [-0.5, 1.0] | ML/AI title match; negative for marketing/HR         |
+| `product_company_score`  | [0, 0.8]    | Product/tech vs IT services background               |
+| `total_years_experience` | continuous  | From `profile.years_of_experience`                   |
+| `experience_band_match`  | [0.2, 1.0]  | Peak at 6–8 yrs per JD spec                          |
+| `ml_years_estimate`      | continuous  | Calculated from career_history titles + dates        |
+| `ai_core_skills_count`   | integer     | Count of AI-pattern-matching skills                  |
+| `ai_skill_depth_score`   | continuous  | Weighted by proficiency × duration                   |
+| `availability_score`     | [0, 1]      | Composite of open_to_work, recency, response rate    |
+| `reliability_score`      | [0, 1]      | Interview completion, offer acceptance, verification |
+| `github_fit_score`       | [0, 1]      | Normalized from 0–100 scale                          |
+| `geo_fit_score`          | [0.2, 1.0]  | Location preference for Pune/Noida/India             |
+| `work_mode_fit`          | {0.5, 1.0}  | Hybrid/flexible = 1.0                                |
+| `notice_period_penalty`  | [0, 1]      | Escalates past 30 days                               |
+| `honeypot_risk_score`    | [0, 1]      | Composite of 3 honeypot detectors                    |
+| `semantic_similarity`    | [0, 1]      | Cosine sim (computed at inference time)              |
 
 ---
 
@@ -225,13 +219,20 @@ ai-candidate-ranking/
 │   ├── __init__.py
 │   ├── data_loader.py                  # JSONL streaming & JD parsing
 │   ├── embeddings.py                   # Text builder & sentence-transformers
+│   ├── env_check.py                    # Script to verify environment constraints
 │   ├── features.py                     # 15 recruiter-domain feature functions
-│   ├── scoring.py                      # Weighted scoring fusion & reasoning
-│   ├── precompute.py                   # CLI: batch precompute (Step 1)
 │   ├── inference.py                    # CLI: fast CPU inference (Step 2)
-│   └── sandbox_app.py                  # Streamlit interactive demo
+│   ├── precompute.py                   # CLI: batch precompute (Step 1)
+│   ├── preprocess.py                   # Preprocessing utilities
+│   ├── ranker.py                       # Core ranking abstractions
+│   ├── sandbox_app.py                  # Streamlit interactive demo
+│   ├── scoring.py                      # Weighted scoring fusion & reasoning
+│   ├── utils.py                        # Helper utilities
+│   └── validate_submission.py          # Script to validate submission format
 │
 └── outputs/
+    ├── models/                         # For custom trained weights (if any)
+    ├── reports/                        # Generation logs and reports
     └── submissions/
         └── ranked_candidates.csv       # Final submission CSV
 ```
@@ -240,23 +241,23 @@ ai-candidate-ranking/
 
 ## 📓 Notebooks
 
-| Notebook | Purpose | Key Outputs |
-|----------|---------|-------------|
-| **01_eda** | Explores the JD, schema, signals, and sample candidates. Identifies feature ideas and honeypot patterns. | Feature hypotheses |
-| **02_pipeline_dev** | Develops and tests the full feature engineering pipeline on a 5k dev subset. Runs full 100k precomputation. | `data/processed/*` artifacts |
-| **03_inference** | Loads precomputed artifacts, scores all candidates, generates reasoning, writes submission CSV, and runs the official validator. | `ranked_candidates.csv` ✅ |
+| Notebook            | Purpose                                                                                                                          | Key Outputs                  |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| **01_eda**          | Explores the JD, schema, signals, and sample candidates. Identifies feature ideas and honeypot patterns.                         | Feature hypotheses           |
+| **02_pipeline_dev** | Develops and tests the full feature engineering pipeline on a 5k dev subset. Runs full 100k precomputation.                      | `data/processed/*` artifacts |
+| **03_inference**    | Loads precomputed artifacts, scores all candidates, generates reasoning, writes submission CSV, and runs the official validator. | `ranked_candidates.csv` ✅   |
 
 ---
 
 ## 🔧 Technical Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| **all-MiniLM-L6-v2** (22M params) | Fast enough for 100k candidates on CPU; 384-dim embeddings keep cosine sim fast |
-| **No LLM calls** | Budget constraint: 5 min for 100k candidates rules out per-candidate LLM evaluation |
-| **Precompute/inference split** | Embedding 100k candidates takes ~15 min — do it offline, then inference is < 30 seconds |
-| **Heuristic scoring (no ML model)** | No labeled training data (no recruiter decisions to learn from), so hand-tuned weights |
-| **Honeypot penalty, not filter** | Soft penalty preserves borderline candidates while strongly demoting obvious fakes |
+| Decision                            | Rationale                                                                               |
+| ----------------------------------- | --------------------------------------------------------------------------------------- |
+| **all-MiniLM-L6-v2** (22M params)   | Fast enough for 100k candidates on CPU; 384-dim embeddings keep cosine sim fast         |
+| **No LLM calls**                    | Budget constraint: 5 min for 100k candidates rules out per-candidate LLM evaluation     |
+| **Precompute/inference split**      | Embedding 100k candidates takes ~15 min — do it offline, then inference is < 30 seconds |
+| **Heuristic scoring (no ML model)** | No labeled training data (no recruiter decisions to learn from), so hand-tuned weights  |
+| **Honeypot penalty, not filter**    | Soft penalty preserves borderline candidates while strongly demoting obvious fakes      |
 
 ---
 
@@ -303,4 +304,4 @@ external_data_used: false
 
 ---
 
-*Built with ❤️ for better hiring — Redrob Intelligent Candidate Discovery & Ranking Challenge*
+_Built with ❤️ for better hiring — Redrob Intelligent Candidate Discovery & Ranking Challenge_
