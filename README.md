@@ -133,24 +133,24 @@ We combine **semantic NLP** with **recruiter-domain heuristics** into a single w
 
 | Component                    | Weight | Signal Source                                                |
 | ---------------------------- | ------ | ------------------------------------------------------------ |
-| **Semantic Similarity**      | 35%    | Cosine similarity between JD and candidate text embeddings   |
+| **Semantic Similarity**      | 30%    | Cosine similarity between JD and candidate text embeddings   |
 | **Role Title Fit**           | 10%    | Regex match against ML/AI/Search title patterns              |
-| **Product Company Affinity** | 10%    | Penalizes pure IT services backgrounds (Infosys, TCS, Wipro) |
+| **Product Company Affinity** | 8%     | Penalizes pure IT services backgrounds (Infosys, TCS, Wipro) |
 | **Experience Band Match**    | 10%    | Peaks at 6–8 years (JD requirement), tapers outside          |
 | **ML Years Estimate**        | 10%    | Actual time spent in ML-titled roles from career history     |
 | **AI Skill Depth**           | 5%     | Proficiency × duration weighted score across AI skills       |
-| **Availability**             | 5%     | Open-to-work flag, recency, recruiter response rate          |
-| **Reliability**              | 5%     | Interview completion rate, verification status               |
-| **GitHub Activity**          | 5%     | Normalized GitHub activity score (0–100 → 0–1)               |
-| **Geo Fit**                  | 3%     | Pune/Noida = 1.0, India = 0.8, US/UK = 0.2                   |
+| **Availability**             | 4%     | Open-to-work flag, recency, recruiter response rate          |
+| **Reliability**              | 4%     | Interview completion rate, verification status               |
+| **GitHub Activity**          | 3%     | Normalized GitHub activity score (0–100 → 0–1)               |
+| **Geo Fit**                  | 2%     | Location preference alignment                                |
 | **Work Mode Fit**            | 2%     | Hybrid/flexible preference alignment                         |
 
 **Penalties applied after scoring:**
 
-| Penalty       | Scale   | Trigger                              |
-| ------------- | ------- | ------------------------------------ |
-| Notice Period | α = 0.5 | > 30 days notice period              |
-| Honeypot Risk | β = 1.0 | Impossible experience/skill patterns |
+| Penalty       | Scale    | Trigger                              |
+| ------------- | -------- | ------------------------------------ |
+| Notice Period | α = 0.15 | > 30 days notice period              |
+| Honeypot Risk | β = 0.30 | Impossible experience/skill patterns |
 
 Final score = `clip(weighted_sum − penalties, 0, 1)`
 
@@ -219,16 +219,12 @@ ai-candidate-ranking/
 │   ├── __init__.py
 │   ├── data_loader.py                  # JSONL streaming & JD parsing
 │   ├── embeddings.py                   # Text builder & sentence-transformers
-│   ├── env_check.py                    # Script to verify environment constraints
 │   ├── features.py                     # 15 recruiter-domain feature functions
 │   ├── inference.py                    # CLI: fast CPU inference (Step 2)
 │   ├── precompute.py                   # CLI: batch precompute (Step 1)
-│   ├── preprocess.py                   # Preprocessing utilities
-│   ├── ranker.py                       # Core ranking abstractions
 │   ├── sandbox_app.py                  # Streamlit interactive demo
 │   ├── scoring.py                      # Weighted scoring fusion & reasoning
-│   ├── utils.py                        # Helper utilities
-│   └── validate_submission.py          # Script to validate submission format
+│   └── utils.py                        # Helper utilities
 │
 └── outputs/
     ├── models/                         # For custom trained weights (if any)

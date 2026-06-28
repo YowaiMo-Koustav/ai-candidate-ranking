@@ -1,14 +1,11 @@
 # ==============================================================================
 # AI Candidate Ranking — Central Configuration
 # ==============================================================================
-# Update this file once you have the actual dataset.
-# All modules read from this config so you only change things in ONE place.
-# ==============================================================================
 
 # --- Project Info ---
 project:
   name: "ai-candidate-ranking"
-  version: "0.1.0"
+  version: "1.0.0"
 
 # --- Data Paths ---
 paths:
@@ -19,65 +16,46 @@ paths:
   submissions: "outputs/submissions/"
   reports: "outputs/reports/"
 
-# --- Dataset Schema ---
-# TODO: Update these column names once you have the actual dataset.
-# These are placeholder names — the pipeline uses these keys to find columns.
+# --- Dataset ---
 dataset:
-  candidates_file: "candidates.csv"       # filename inside raw_data
-  jobs_file: "jobs.csv"                   # filename inside raw_data
-
-  # Column mappings for candidate data
-  candidate_columns:
-    id: "candidate_id"                    # unique candidate identifier
-    name: "candidate_name"               # candidate name (optional)
-    resume_text: "resume_text"           # full resume / profile text
-    skills: "skills"                      # comma-separated skills
-    experience_years: "experience_years"  # total years of experience
-    education: "education"                # education level or description
-    job_title: "current_title"           # current or most recent job title
-    # Add more columns as needed:
-    # location: "location"
-    # certifications: "certifications"
-
-  # Column mappings for job description data
-  job_columns:
-    id: "job_id"                          # unique job identifier
-    title: "job_title"                    # job title
-    description: "job_description"        # full JD text
-    required_skills: "required_skills"    # comma-separated required skills
-    min_experience: "min_experience"      # minimum years of experience
-    # Add more columns as needed:
-    # preferred_skills: "preferred_skills"
-    # education_requirement: "education_req"
+  candidates_file: "candidates.jsonl"          # JSONL, one candidate per line
+  job_description_file: "job_description.docx" # Word doc with full JD
 
 # --- Embedding Settings ---
 embeddings:
-  model_name: "all-MiniLM-L6-v2"         # sentence-transformers model
-  batch_size: 32
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  batch_size: 128
   max_seq_length: 512
-  # Alternative models (uncomment to use):
-  # model_name: "all-mpnet-base-v2"       # higher quality, slower
-  # model_name: "paraphrase-MiniLM-L6-v2" # good for paraphrase detection
 
-# --- Scoring Weights ---
-# These control how much each signal contributes to the final rank.
-# Must sum to 1.0 (the pipeline will normalize if they don't).
+# --- Scoring Weights (total positive = 0.88) ---
 scoring:
-  semantic_weight: 0.50                   # cosine similarity of embeddings
-  skills_weight: 0.25                     # skill overlap score
-  experience_weight: 0.15                 # experience match score
-  education_weight: 0.10                  # education relevance score
+  weights:
+    semantic: 0.30        # Cosine similarity of embeddings
+    role: 0.10            # Role title fit (ML/AI title match)
+    product: 0.08         # Product company affinity
+    exp_band: 0.10        # Experience band match (peaks at 6-8 YOE)
+    ml_years: 0.10        # ML years estimate from career history
+    ai_depth: 0.05        # AI skill depth (proficiency × duration)
+    avail: 0.04           # Availability signals
+    rel: 0.04             # Reliability signals
+    github: 0.03          # GitHub activity score
+    geo: 0.02             # Geographic fit
+    work_mode: 0.02       # Work mode preference fit
+
+  penalties:
+    notice_period_alpha: 0.15   # Notice period penalty scale
+    honeypot_risk_beta: 0.30    # Honeypot risk penalty scale
 
 # --- Ranking ---
 ranking:
-  top_k: 10                              # number of candidates to shortlist
-  score_threshold: 0.0                   # minimum score to include (0 = include all)
+  top_k: 100                   # Number of candidates to shortlist
+  honeypot_threshold: 0.6      # Filter out candidates above this honeypot risk
 
-# --- Optional: Supervised Re-ranker ---
-# Uncomment and configure if you have labeled data (recruiter decisions).
-# supervised:
-#   enabled: false
-#   model_type: "xgboost"                # "xgboost" or "lightgbm"
-#   label_column: "shortlisted"          # 1 = shortlisted, 0 = rejected
-#   train_split: 0.8
-#   random_seed: 42
+# --- Submission Spec ---
+submission:
+  columns:
+    - "candidate_id"
+    - "rank"
+    - "score"
+    - "reasoning"
+  num_rows: 100

@@ -47,3 +47,52 @@ def build_jd_text(docx_path):
     except Exception as e:
         print(f"Error reading JD: {e}")
         return ""
+
+
+def load_candidates_for_ids(path, target_ids):
+    """
+    Stream a JSONL (or JSON array) file and return a dict of
+    {candidate_id: candidate_dict} for only the requested IDs.
+
+    Args:
+        path (str): Path to candidates.jsonl or .json file.
+        target_ids (set): Set of candidate_id strings to collect.
+
+    Returns:
+        dict: Mapping from candidate_id to full candidate dict.
+    """
+    target_ids = set(target_ids)
+    result = {}
+
+    # Detect format
+    is_json_array = False
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            first_char = f.read(1)
+        is_json_array = (first_char == "[")
+    except Exception:
+        pass
+
+    if is_json_array:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            for cand in data:
+                cid = cand.get("candidate_id")
+                if cid in target_ids:
+                    result[cid] = cand
+                    if len(result) == len(target_ids):
+                        break
+    else:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                cand = json.loads(line)
+                cid = cand.get("candidate_id")
+                if cid in target_ids:
+                    result[cid] = cand
+                    if len(result) == len(target_ids):
+                        break
+
+    return result

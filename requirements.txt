@@ -8,9 +8,12 @@ sentence-transformers>=2.2.0
 transformers>=4.30.0
 torch>=2.0.0
 
-# Text Processing
-nltk>=3.8.0
-spacy>=3.6.0
+# Document Parsing
+python-docx>=0.8.11
+
+# Data Formats
+pyarrow>=12.0.0
+python-dateutil>=2.8.0
 
 # Configuration
 pyyaml>=6.0
@@ -22,14 +25,10 @@ ipykernel>=6.0.0
 # Visualization
 matplotlib>=3.7.0
 seaborn>=0.12.0
-wordcloud>=1.9.0
 
 # Utilities
 tqdm>=4.65.0
+psutil>=5.9.0
 
-# Optional: API-based embeddings (uncomment if using OpenAI)
-# openai>=1.0.0
-
-# Optional: Supervised re-ranking (uncomment when needed)
-# xgboost>=2.0.0
-# lightgbm>=4.0.0
+# Sandbox / Demo
+streamlit>=1.24.0

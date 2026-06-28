@@ -49,3 +49,7 @@ outputs/reports/*
 
 # OS
 Thumbs.db
+
+# Further
+
+./further.md

@@ -1,7 +1,10 @@
 import argparse
 import os
 import time
-import psutil
+try:
+    import psutil
+except ImportError:
+    psutil = None
 import numpy as np
 import pandas as pd
 
@@ -36,13 +39,9 @@ def main():
     
     cands_path = args.candidates
     if not os.path.exists(cands_path):
-        alt_path = "data/raw/sample_candidates.json"
-        if os.path.exists(alt_path):
-            print(f"Warning: full {cands_path} not found, using {alt_path} for demo")
-            cands_path = alt_path
-        else:
-            print(f"Error: Could not find candidates file at {cands_path}")
-            return
+        print(f"Error: Candidates file not found at {cands_path}")
+        print("Please place candidates.jsonl in data/raw/ before running precompute.")
+        return
             
     candidate_texts_full = []
     candidate_ids_full = []
@@ -98,12 +97,13 @@ def main():
     full_features_df.to_parquet(args.features_out, index=False)
     
     total_time = time.time() - start_time
-    process = psutil.Process(os.getpid())
-    mem_mb = process.memory_info().rss / (1024 * 1024)
-    
     print("=== Precomputation Complete ===")
     print(f"Total Execution Time: {total_time:.2f} seconds")
-    print(f"Peak Memory Usage: {mem_mb:.2f} MB")
+    print(f"Candidates processed: {len(candidate_ids_full)}")
+    if psutil:
+        process = psutil.Process(os.getpid())
+        mem_mb = process.memory_info().rss / (1024 * 1024)
+        print(f"Peak Memory Usage: {mem_mb:.2f} MB")
 
 if __name__ == "__main__":
     main()

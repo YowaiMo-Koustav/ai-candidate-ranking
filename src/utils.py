@@ -167,32 +167,39 @@ def print_ranking(ranked_df, score_col="hybrid_score", max_rows=10):
 
 
 # ==============================================================================
-# Colab Helpers
+# Path Resolution
 # ==============================================================================
 
-def setup_colab():
+def get_base_dir():
     """
-    Set up the environment for Google Colab.
-    Call this at the top of any Colab notebook.
+    Resolve the project root directory.
+
+    Works in three contexts:
+      1. Google Colab — checks /content/ai-candidate-ranking
+      2. Running from notebooks/ — returns parent directory
+      3. Running from project root — returns "."
 
     Returns:
-        str: Project root path.
+        str: Absolute path to the project root.
     """
-    import sys
+    # 1. Colab
+    colab_path = "/content/ai-candidate-ranking"
+    if os.path.exists(colab_path):
+        return colab_path
 
-    # Common Colab project paths
-    possible_paths = [
-        "/content/ai-candidate-ranking",
-        "/content/drive/MyDrive/ai-candidate-ranking",
-    ]
+    # 2. Running from notebooks/ subdirectory
+    cwd = os.getcwd()
+    if os.path.basename(cwd) == "notebooks":
+        return os.path.abspath(os.path.join(cwd, ".."))
 
-    for path in possible_paths:
-        if os.path.exists(path):
-            if path not in sys.path:
-                sys.path.insert(0, path)
-            os.chdir(path)
-            print(f"✅ Working directory set to: {path}")
-            return path
+    # 3. Check if CWD itself is the project root (has src/ and data/)
+    if os.path.isdir(os.path.join(cwd, "src")) and os.path.isdir(os.path.join(cwd, "data")):
+        return cwd
 
-    print("⚠️ Project directory not found. Please set path manually.")
-    return os.getcwd()
+    # 4. Fallback: walk up from this file's location
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    parent = os.path.abspath(os.path.join(this_dir, ".."))
+    if os.path.isdir(os.path.join(parent, "data")):
+        return parent
+
+    return cwd
