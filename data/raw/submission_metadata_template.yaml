@@ -25,7 +25,7 @@ methodology_summary: >-
   4. Combine semantic cosine similarity with weighted feature scores.
   5. Filter honeypot candidates (risk >= 0.6), select top 100, generate
      JD-aware reasoning referencing specific candidate facts.
-  Single-command reproduction: python -m src.inference --out submission.csv
+  Single-command reproduction: python -m src.inference --out team_NPCsWithWifi.csv
 
 features_used:
   - "semantic_similarity"

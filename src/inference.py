@@ -224,18 +224,19 @@ def main():
     filtered_df = full_df[full_df["honeypot_risk_score"] < 0.6].copy()
     honeypot_count = n_candidates - len(filtered_df)
 
+    filtered_df["score"] = filtered_df["final_score"].round(4)
+
     # Sort by score DESC, then candidate_id ASC for deterministic tie-breaking
     # Per spec §3: "Break score ties deterministically using a secondary signal
     # from your model, or by candidate_id ascending."
     ranked_df = filtered_df.sort_values(
-        by=["final_score", "candidate_id"],
+        by=["score", "candidate_id"],
         ascending=[False, True],
     ).head(TOP_K).copy()
 
     ranked_df["rank"] = range(1, len(ranked_df) + 1)
-    ranked_df["score"] = ranked_df["final_score"].round(4)
 
-    # Enforce monotonically non-increasing scores after rounding
+    # Enforce monotonically non-increasing scores
     prev_score = ranked_df.iloc[0]["score"]
     adjusted_scores = []
     for s in ranked_df["score"]:

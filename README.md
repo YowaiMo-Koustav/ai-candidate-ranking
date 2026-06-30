@@ -63,7 +63,7 @@ Loads precomputed artifacts, encodes the JD, computes similarity, scores, ranks,
 python -m src.inference \
   --candidates data/raw/candidates.jsonl \
   --job-desc data/raw/job_description.docx \
-  --out outputs/submissions/ranked_candidates.csv
+  --out outputs/submissions/team_NPCsWithWifi.csv
 ```
 
 **CLI Arguments** (all have sensible defaults):
@@ -75,14 +75,14 @@ python -m src.inference \
 | `--embeddings`    | `data/processed/embeddings.npy`             | Precomputed embeddings       |
 | `--candidate-ids` | `data/processed/candidate_ids.npy`          | Candidate ID mapping         |
 | `--features`      | `data/processed/candidates_feather.parquet` | Feature matrix               |
-| `--out`           | `outputs/submissions/ranked_candidates.csv` | Output CSV path              |
+| `--out`           | `outputs/submissions/team_NPCsWithWifi.csv` | Output CSV path              |
 | `--top-k`         | `100`                                       | Number of candidates to rank |
 
 ### 5. Validate
 
 ```bash
 python data/raw/validate_submission.py \
-  outputs/submissions/ranked_candidates.csv \
+  outputs/submissions/team_NPCsWithWifi.csv \
   submission_metadata.yaml
 ```
 
@@ -230,7 +230,7 @@ ai-candidate-ranking/
     ├── models/                         # For custom trained weights (if any)
     ├── reports/                        # Generation logs and reports
     └── submissions/
-        └── ranked_candidates.csv       # Final submission CSV
+        └── team_NPCsWithWifi.csv       # Final submission CSV
 ```
 
 ---
@@ -241,7 +241,7 @@ ai-candidate-ranking/
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | **01_eda**          | Explores the JD, schema, signals, and sample candidates. Identifies feature ideas and honeypot patterns.                         | Feature hypotheses           |
 | **02_pipeline_dev** | Develops and tests the full feature engineering pipeline on a 5k dev subset. Runs full 100k precomputation.                      | `data/processed/*` artifacts |
-| **03_inference**    | Loads precomputed artifacts, scores all candidates, generates reasoning, writes submission CSV, and runs the official validator. | `ranked_candidates.csv` ✅   |
+| **03_inference**    | Loads precomputed artifacts, scores all candidates, generates reasoning, writes submission CSV, and runs the official validator. | `team_NPCsWithWifi.csv` ✅   |
 
 ---
 

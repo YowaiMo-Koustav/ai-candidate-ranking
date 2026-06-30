@@ -253,7 +253,7 @@ if candidates_list:
         st.download_button(
             label=f"📥 Download Top {len(top_df)} as CSV",
             data=csv_data,
-            file_name="ranked_candidates.csv",
+            file_name="team_NPCsWithWifi.csv",
             mime="text/csv",
         )
 
