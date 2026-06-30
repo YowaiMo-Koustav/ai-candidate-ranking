@@ -50,6 +50,8 @@ outputs/reports/*
 # OS
 Thumbs.db
 
-# Further
-
-./further.md
+# Large data files (explicit for clarity)
+data/raw/candidates.jsonl
+data/processed/*.npy
+data/processed/*.parquet
+*.parquet

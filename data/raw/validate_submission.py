@@ -6,7 +6,7 @@ def validate_submission(csv_path: str, meta_path: str):
     print(f"Validating {csv_path}...")
     try:
         df = pd.read_csv(csv_path)
-        required_cols = {'candidate_id', 'job_id', 'score'}
+        required_cols = {'candidate_id', 'rank', 'score', 'reasoning'}
         if not required_cols.issubset(set(df.columns)):
             print(f"Error: Missing required columns. Expected at least: {required_cols}")
             return False

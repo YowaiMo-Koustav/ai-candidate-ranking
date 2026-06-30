@@ -11,7 +11,7 @@ Given a single Job Description (Senior AI Engineer — Founding Team at Redrob A
 - Run the final ranking step on **CPU-only, 16 GB RAM, no network access**, under **5 minutes**.
 - Generate **unique, human-readable reasoning** for every ranked candidate.
 - Detect and demote **~80 honeypot candidates** (subtly impossible profiles).
-- Produce a submission matching the exact CSV spec: `candidate_id, job_id, rank, score, reasoning`.
+- Produce a submission matching the exact CSV spec: `candidate_id, rank, score, reasoning` — top 100 candidates.
 
 ---
 
@@ -287,8 +287,8 @@ external_data_used: false
 
 ## 📋 Submission Checklist
 
-- [x] Exactly 100 rows
-- [x] Columns: `candidate_id`, `job_id`, `rank`, `score`, `reasoning`
+- [x] Exactly 100 rows (top-100 ranking)
+- [x] Columns: `candidate_id`, `rank`, `score`, `reasoning`
 - [x] Ranks 1–100, starting at 1
 - [x] Scores monotonically non-increasing
 - [x] No duplicate candidate IDs

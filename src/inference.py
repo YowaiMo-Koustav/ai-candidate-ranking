@@ -1,3 +1,11 @@
+"""
+inference.py — CLI entry point for the full candidate ranking pipeline.
+
+Scores ALL 100,000 candidates, then outputs the TOP 100 ranked.
+Outputs a spec-compliant CSV: candidate_id, rank, score, reasoning.
+Per submission_spec.docx: exactly 100 rows, ranks 1–100.
+"""
+
 import argparse
 import os
 import json
@@ -11,31 +19,47 @@ from src.embeddings import load_encoder_model
 from src.scoring import compute_final_score, generate_reasoning
 
 
+TOP_K = 100  # Per submission spec: exactly 100 candidates
+
+
 def validate_submission(submission_df, candidates_path):
     """
     Run spec guardrail assertions on the submission DataFrame.
-    Raises AssertionError if any check fails.
+    Matches submission_spec.docx requirements exactly.
     """
-    # Work with core columns only (ignore job_id if present)
-    check_df = submission_df
+    import re
+
     # 1. Exactly 100 rows
-    assert len(check_df) == 100, (
-        f"Expected 100 rows, got {len(check_df)}"
+    assert len(submission_df) == TOP_K, (
+        f"Expected {TOP_K} rows, got {len(submission_df)}"
     )
 
-    # 2. Ranks 1..100 with no gaps or duplicates
-    ranks = check_df["rank"].tolist()
-    assert sorted(set(ranks)) == list(range(1, 101)), (
-        "Ranks must be 1..100 with no gaps or duplicates"
+    # 2. Exactly 4 columns in correct order
+    expected_cols = ["candidate_id", "rank", "score", "reasoning"]
+    assert list(submission_df.columns) == expected_cols, (
+        f"Expected columns {expected_cols}, got {list(submission_df.columns)}"
     )
 
-    # 3. No duplicate candidate IDs
-    ids = check_df["candidate_id"].tolist()
+    # 3. Ranks 1..100 with no gaps or duplicates
+    ranks = submission_df["rank"].tolist()
+    assert sorted(set(ranks)) == list(range(1, TOP_K + 1)), (
+        f"Ranks must be 1..{TOP_K} with no gaps or duplicates"
+    )
+
+    # 4. No duplicate candidate IDs
+    ids = submission_df["candidate_id"].tolist()
     assert len(set(ids)) == len(ids), (
         "Duplicate candidate_id values found in submission"
     )
 
-    # 4. All IDs exist in the original candidates file
+    # 5. All IDs match CAND_XXXXXXX format
+    pattern = re.compile(r"^CAND_\d{7}$")
+    bad_ids = [cid for cid in ids if not pattern.match(cid)]
+    assert not bad_ids, (
+        f"IDs not matching CAND_XXXXXXX format: {bad_ids[:5]}"
+    )
+
+    # 6. All IDs exist in candidates.jsonl
     cand_ids = set()
     with open(candidates_path, "r", encoding="utf-8") as f:
         for line in f:
@@ -46,30 +70,40 @@ def validate_submission(submission_df, candidates_path):
             cid = cand.get("candidate_id")
             if cid:
                 cand_ids.add(cid)
-
     missing = [cid for cid in ids if cid not in cand_ids]
     assert not missing, (
-        f"{len(missing)} candidate_ids not found in candidates.jsonl: {missing[:5]}"
+        f"{len(missing)} candidate_ids not in candidates.jsonl: {missing[:5]}"
     )
 
-    # 5. Scores monotonically non-increasing
-    scores = check_df["score"].tolist()
+    # 7. Scores in [0, 1]
+    scores = submission_df["score"].tolist()
+    assert all(0.0 <= s <= 1.0 for s in scores), (
+        "All scores must be between 0.0 and 1.0"
+    )
+
+    # 8. Scores monotonically non-increasing (spec requirement)
     mono = all(scores[i] >= scores[i + 1] for i in range(len(scores) - 1))
     assert mono, "Scores must be monotonically non-increasing with rank"
 
-    # 6. Scores not all identical
-    assert len(set(scores)) > 1, (
-        "All scores are identical – this is discouraged by the spec"
+    # 9. Scores not all identical
+    assert len(set(round(s, 6) for s in scores)) > 1, (
+        "All scores are identical — scoring has a degeneration bug"
+    )
+
+    # 10. No NaN or empty values
+    assert submission_df.isna().sum().sum() == 0, "NaN values found"
+    assert (submission_df["reasoning"].str.strip() != "").all(), (
+        "Empty reasoning strings found"
     )
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run Candidate Ranking Inference (Offline)"
+        description="AI Candidate Ranking — Inference Pipeline (Top-100)"
     )
     parser.add_argument(
         "--candidates", type=str, default="data/raw/candidates.jsonl",
-        help="Path to raw candidates JSONL (used for reasoning enrichment).",
+        help="Path to raw candidates JSONL.",
     )
     parser.add_argument(
         "--job-desc", type=str, default="data/raw/job_description.docx",
@@ -91,15 +125,12 @@ def main():
         "--out", type=str, default="outputs/submissions/ranked_candidates.csv",
         help="Path to save the final submission CSV.",
     )
-    parser.add_argument(
-        "--top-k", type=int, default=100,
-        help="Number of top candidates to include in the output.",
-    )
 
     args = parser.parse_args()
 
     print("=" * 60)
-    print("  AI Candidate Ranking — Inference Pipeline")
+    print("  AI Candidate Ranking — Inference (Top-100)")
+    print("  Team: NPCsWithWifi")
     print("=" * 60)
     pipeline_start = time.time()
 
@@ -113,7 +144,8 @@ def main():
     cand_embeddings = np.load(args.embeddings)
     features_df = pd.read_parquet(args.features)
 
-    print(f"  Loaded {len(candidate_ids)} candidate IDs")
+    n_candidates = len(candidate_ids)
+    print(f"  Loaded {n_candidates} candidate IDs")
     print(f"  Embeddings shape: {cand_embeddings.shape}")
     print(f"  Features shape: {features_df.shape}")
     print(f"  ⏱  {time.time() - t0:.2f}s")
@@ -132,15 +164,15 @@ def main():
     print(f"  ⏱  {time.time() - t0:.2f}s")
 
     # ------------------------------------------------------------------
-    # 3. Compute Semantic Similarity
+    # 3. Compute Semantic Similarity (all 100k)
     # ------------------------------------------------------------------
     t0 = time.time()
-    print(f"\n[3/7] Computing cosine similarities...")
+    print(f"\n[3/7] Computing cosine similarities for {n_candidates} candidates...")
 
     if cand_embeddings.shape[0] > 0 and jd_embedding.shape[0] > 0:
         similarities = cosine_similarity(jd_embedding, cand_embeddings)[0]
     else:
-        similarities = np.zeros(len(candidate_ids))
+        similarities = np.zeros(n_candidates)
 
     sim_df = pd.DataFrame({
         "candidate_id": candidate_ids,
@@ -148,63 +180,43 @@ def main():
     })
     full_df = pd.merge(features_df, sim_df, on="candidate_id", how="inner")
     print(f"  Merged DataFrame: {full_df.shape}")
+    print(f"  Similarity range: {similarities.min():.4f} – {similarities.max():.4f}")
     print(f"  ⏱  {time.time() - t0:.2f}s")
 
     # ------------------------------------------------------------------
-    # 4. Final Scoring
+    # 4. Final Scoring (all 100k)
     # ------------------------------------------------------------------
     t0 = time.time()
-    print(f"\n[4/7] Computing final scores...")
+    print(f"\n[4/7] Computing final scores for ALL {n_candidates} candidates...")
 
-    max_ml = full_df["ml_years_estimate"].max() if "ml_years_estimate" in full_df.columns else 1.0
+    max_ml = full_df["ml_years_estimate"].max()
+    if max_ml == 0:
+        max_ml = 1.0
+
     full_df["final_score"] = full_df.apply(
         lambda row: compute_final_score(row, max_ml_years=max_ml), axis=1
     )
 
     print(f"  Score range: {full_df['final_score'].min():.4f} – {full_df['final_score'].max():.4f}")
+    print(f"  Unique scores: {full_df['final_score'].nunique()}")
     print(f"  ⏱  {time.time() - t0:.2f}s")
 
     # ------------------------------------------------------------------
-    # 5. Filter and Rank
+    # 5. Select Top-100
     # ------------------------------------------------------------------
     t0 = time.time()
-    print(f"\n[5/7] Filtering honeypots and ranking top {args.top_k}...")
+    print(f"\n[5/7] Selecting top {TOP_K} candidates from {n_candidates}...")
 
+    # Filter high-risk honeypots before ranking
     filtered_df = full_df[full_df["honeypot_risk_score"] < 0.6].copy()
-    ranked_df = filtered_df.sort_values(by="final_score", ascending=False).head(args.top_k).copy()
+    honeypot_count = n_candidates - len(filtered_df)
 
-    honeypot_count = len(full_df) - len(filtered_df)
-    print(f"  Filtered out {honeypot_count} high-risk honeypot candidates")
-    print(f"  Top {args.top_k} selected from {len(filtered_df)} remaining")
-    print(f"  ⏱  {time.time() - t0:.2f}s")
+    ranked_df = filtered_df.sort_values(
+        by="final_score", ascending=False
+    ).head(TOP_K).copy()
 
-    # ------------------------------------------------------------------
-    # 6. Generate JD-Aware Reasoning
-    # ------------------------------------------------------------------
-    t0 = time.time()
-    print(f"\n[6/7] Generating context-aware reasoning...")
-
-    top_ids = set(ranked_df["candidate_id"].values)
-    cand_details = load_candidates_for_ids(args.candidates, top_ids)
-    print(f"  Loaded raw details for {len(cand_details)}/{len(top_ids)} candidates")
-
-    def safe_reasoning(row):
-        cid = row["candidate_id"]
-        return generate_reasoning(row, cand_raw=cand_details.get(cid))
-
-    ranked_df["reasoning"] = ranked_df.apply(safe_reasoning, axis=1)
-    unique_reasons = ranked_df["reasoning"].nunique()
-    print(f"  Unique reasonings: {unique_reasons}/{len(ranked_df)}")
-    print(f"  ⏱  {time.time() - t0:.2f}s")
-
-    # ------------------------------------------------------------------
-    # 7. Format and Export
-    # ------------------------------------------------------------------
-    t0 = time.time()
-    print(f"\n[7/7] Formatting final submission...")
-
-    ranked_df["score"] = ranked_df["final_score"].round(3)
     ranked_df["rank"] = range(1, len(ranked_df) + 1)
+    ranked_df["score"] = ranked_df["final_score"].round(4)
 
     # Enforce monotonically non-increasing scores
     prev_score = ranked_df.iloc[0]["score"]
@@ -217,9 +229,39 @@ def main():
             prev_score = s
     ranked_df["score"] = adjusted_scores
 
-    # Build submission with job_id for validator compatibility
+    print(f"  Filtered out {honeypot_count} honeypot candidates")
+    print(f"  Selected top {TOP_K} from {len(filtered_df)} remaining")
+    print(f"  Score range (top {TOP_K}): {ranked_df['score'].min():.4f} – {ranked_df['score'].max():.4f}")
+    print(f"  ⏱  {time.time() - t0:.2f}s")
+
+    # ------------------------------------------------------------------
+    # 6. Generate JD-Aware Reasoning (top 100 only)
+    # ------------------------------------------------------------------
+    t0 = time.time()
+    print(f"\n[6/7] Generating context-aware reasoning for top {TOP_K}...")
+
+    top_ids = set(ranked_df["candidate_id"].values)
+    cand_details = load_candidates_for_ids(args.candidates, top_ids)
+    print(f"  Loaded raw details for {len(cand_details)}/{len(top_ids)} candidates")
+
+    reasonings = []
+    for _, row in ranked_df.iterrows():
+        cid = row["candidate_id"]
+        cand_raw = cand_details.get(cid)
+        reasonings.append(generate_reasoning(row, cand_raw=cand_raw))
+    ranked_df["reasoning"] = reasonings
+
+    unique_reasons = ranked_df["reasoning"].nunique()
+    print(f"  Unique reasonings: {unique_reasons}/{TOP_K}")
+    print(f"  ⏱  {time.time() - t0:.2f}s")
+
+    # ------------------------------------------------------------------
+    # 7. Format and Export — exactly 4 columns per spec
+    # ------------------------------------------------------------------
+    t0 = time.time()
+    print(f"\n[7/7] Formatting and exporting submission...")
+
     submission_df = ranked_df[["candidate_id", "rank", "score", "reasoning"]].copy()
-    submission_df.insert(1, "job_id", "JD_SENIOR_AI_ENGINEER")
 
     # Run spec guardrails
     print("\n  Running spec guardrails...")
@@ -243,11 +285,13 @@ def main():
 
     elapsed = time.time() - pipeline_start
     print(f"\n{'=' * 60}")
-    print(f"  ✅ Inference Complete in {elapsed:.2f}s")
+    print(f"  ✅ Inference Complete in {elapsed:.1f}s")
     print(f"  Saved: {args.out}")
     print(f"  Saved: {validated_path}")
+    print(f"  Rows: {len(submission_df)} | Columns: {list(submission_df.columns)}")
     print(f"  Score range: {submission_df['score'].min():.4f} – {submission_df['score'].max():.4f}")
     print(f"  Unique scores: {submission_df['score'].nunique()}/{len(submission_df)}")
+    print(f"  Unique reasonings: {submission_df['reasoning'].nunique()}/{len(submission_df)}")
     print(f"{'=' * 60}")
 
 

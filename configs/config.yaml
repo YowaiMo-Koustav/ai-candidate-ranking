@@ -48,8 +48,8 @@ scoring:
 
 # --- Ranking ---
 ranking:
-  top_k: 100                   # Number of candidates to shortlist
-  honeypot_threshold: 0.6      # Filter out candidates above this honeypot risk
+  top_k: 100                    # Top-100 per submission spec
+  honeypot_threshold: 0.6       # Filter candidates above this risk
 
 # --- Submission Spec ---
 submission:
