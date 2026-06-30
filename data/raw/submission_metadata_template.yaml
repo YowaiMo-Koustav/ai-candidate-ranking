@@ -1,0 +1,53 @@
+# submission_metadata.yaml — mirrors portal metadata (per spec §10.3)
+
+team_name: "NPCsWithWifi"
+
+team_members:
+  - name: "ANSHU RAJ"
+    role: "Leader"
+  - name: "KOUSTAV MALLICK"
+    role: "Member"
+  - name: "SOUMYADIP MANDAL"
+    role: "Member"
+
+model_description: >-
+  Sentence-Transformers (all-MiniLM-L6-v2) semantic embeddings + 15
+  hand-engineered recruiter-domain features. Weighted heuristic scoring
+  with honeypot detection and JD-aware reasoning generation. Scores
+  all 100k candidates, then outputs the top 100.
+
+methodology_summary: >-
+  1. Parse JD and 100k candidate profiles from JSONL.
+  2. Compute 384-dim embeddings using all-MiniLM-L6-v2 (pre-computed offline).
+  3. Engineer 15 structured features: role title fit, product-company affinity,
+     experience band match, ML years estimate, AI skill depth, availability,
+     reliability, GitHub activity, geo fit, work mode, notice period, honeypot risk.
+  4. Combine semantic cosine similarity with weighted feature scores.
+  5. Filter honeypot candidates (risk >= 0.6), select top 100, generate
+     JD-aware reasoning referencing specific candidate facts.
+  Single-command reproduction: python -m src.inference --out submission.csv
+
+features_used:
+  - "semantic_similarity"
+  - "role_title_score"
+  - "product_company_score"
+  - "experience_band_match"
+  - "ml_years_estimate"
+  - "ai_core_skills_count"
+  - "ai_skill_depth_score"
+  - "availability_score"
+  - "reliability_score"
+  - "github_fit_score"
+  - "geo_fit_score"
+  - "work_mode_fit"
+  - "notice_period_penalty"
+  - "honeypot_risk_score"
+
+external_data_used: false
+
+compute_environment: "MacBook Pro M2, 16GB RAM, Python 3.11"
+
+ai_tools_declared:
+  - "Gemini"
+
+sandbox_platform: "Streamlit Cloud"

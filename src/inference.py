@@ -193,11 +193,24 @@ def main():
     if max_ml == 0:
         max_ml = 1.0
 
-    full_df["final_score"] = full_df.apply(
+    full_df["raw_score"] = full_df.apply(
         lambda row: compute_final_score(row, max_ml_years=max_ml), axis=1
     )
 
-    print(f"  Score range: {full_df['final_score'].min():.4f} – {full_df['final_score'].max():.4f}")
+    # Rescale scores to use the full [0, 1] range
+    # The raw scoring formula produces compressed values (~0.2–0.7).
+    # Spec example shows 0.412–0.987, so we min-max rescale to spread scores.
+    raw_min = full_df["raw_score"].min()
+    raw_max = full_df["raw_score"].max()
+    if raw_max > raw_min:
+        full_df["final_score"] = (
+            (full_df["raw_score"] - raw_min) / (raw_max - raw_min)
+        )
+    else:
+        full_df["final_score"] = 0.5
+
+    print(f"  Raw score range: {raw_min:.4f} – {raw_max:.4f}")
+    print(f"  Rescaled range:  {full_df['final_score'].min():.4f} – {full_df['final_score'].max():.4f}")
     print(f"  Unique scores: {full_df['final_score'].nunique()}")
     print(f"  ⏱  {time.time() - t0:.2f}s")
 
@@ -211,14 +224,18 @@ def main():
     filtered_df = full_df[full_df["honeypot_risk_score"] < 0.6].copy()
     honeypot_count = n_candidates - len(filtered_df)
 
+    # Sort by score DESC, then candidate_id ASC for deterministic tie-breaking
+    # Per spec §3: "Break score ties deterministically using a secondary signal
+    # from your model, or by candidate_id ascending."
     ranked_df = filtered_df.sort_values(
-        by="final_score", ascending=False
+        by=["final_score", "candidate_id"],
+        ascending=[False, True],
     ).head(TOP_K).copy()
 
     ranked_df["rank"] = range(1, len(ranked_df) + 1)
     ranked_df["score"] = ranked_df["final_score"].round(4)
 
-    # Enforce monotonically non-increasing scores
+    # Enforce monotonically non-increasing scores after rounding
     prev_score = ranked_df.iloc[0]["score"]
     adjusted_scores = []
     for s in ranked_df["score"]:

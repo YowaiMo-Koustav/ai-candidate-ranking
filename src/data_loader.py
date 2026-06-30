@@ -1,5 +1,4 @@
 import json
-from docx import Document
 
 def load_candidates(path, limit=None):
     """
@@ -40,6 +39,7 @@ def build_jd_text(docx_path):
     Loads the JD and extracts critical sections to form a concise query string.
     """
     try:
+        from docx import Document
         doc = Document(docx_path)
         paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
         full_text = "\n".join(paragraphs)
