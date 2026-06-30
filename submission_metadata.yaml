@@ -1,34 +1,66 @@
+# ─── Submission Metadata — NPCsWithWifi ───────────────────────────
+# Mirrors Table 5 from submission_spec.docx (portal metadata fields)
 
 team_name: "NPCsWithWifi"
+
+# Primary Contact (Table 5: required)
 primary_contact_name: "ANSHU RAJ"
 primary_contact_email: "focusanshu77@gmail.com"
 primary_contact_phone: "+91-9142386874"
-team_members:
-  - name: "ANSHU RAJ"
-    role: "Leader"
-  - name: "KOUSTAV MALLICK"
-    role: "Member"
-  - name: "SOUMYADIP MANDAL"
-    role: "Member"
-gitHub_repository_url: "https://github.com/YowaiMo-Koustav/ai-candidate-ranking"
-sandbox_demo_link: ""
-ai_tools_declared: "Antigravity IDE"
-compute_environment: "MacBook Air M1, 8GB RAM, Python 3.14"
-team_members:
-  - name: "ANSHU RAJ"
-    role: "Leader"
-  - name: "KOUSTAV MALLICK"
-    role: "Member"
-  - name: "SOUMYADIP MANDAL"
-    role: "Member"
-methodology_summary: >-
-  1. Parse JD and 100k candidate profiles from JSONL.
-  2. Compute 384-dim embeddings using all-MiniLM-L6-v2 (pre-computed offline).
-  3. Engineer 15 structured features: role title fit, product-company affinity,
-     experience band match, ML years estimate, AI skill depth, availability,
-     reliability, GitHub activity, geo fit, work mode, notice period, honeypot risk.
-  4. Combine semantic cosine similarity with weighted feature scores.
-  5. Filter honeypot candidates (risk >= 0.6), select top 100, generate
-     JD-aware reasoning referencing specific candidate facts.
-  Single-command reproduction: python -m src.inference --out team_NPCsWithWifi.csv
 
+# Team Members (Table 5: Name + email for each member)
+team_members:
+  - name: "ANSHU RAJ"
+    role: "Leader"
+  - name: "KOUSTAV MALLICK"
+    role: "Member"
+  - name: "SOUMYADIP MANDAL"
+    role: "Member"
+
+# Repository & Sandbox (Table 5: required)
+github_repository_url: "https://github.com/YowaiMo-Koustav/ai-candidate-ranking"
+sandbox_demo_link: "https://ai1989.streamlit.app/"
+
+# AI Tools (Table 5: required, multi-select)
+ai_tools_declared:
+  - "Gemini"
+  - "Antigravity IDE"
+
+# Compute Environment (Table 5: required, one line)
+compute_environment: "MacBook Air M1, 8GB RAM, Python 3.14"
+
+# Methodology Summary (Table 5: optional, ≤200 words)
+methodology_summary: >-
+  Two-phase pipeline: (1) Offline precomputation — parse 100k JSONL candidates,
+  engineer 15 recruiter-domain features (role title fit, product-company affinity,
+  experience band match, ML years estimate, AI skill depth, availability,
+  reliability, GitHub activity, geo fit, work mode, notice period, honeypot risk),
+  and compute 384-dim sentence embeddings using all-MiniLM-L6-v2.
+  (2) Fast CPU inference (<20s) — encode JD, compute cosine similarities,
+  combine semantic signal (30% weight) with structured features via weighted
+  scoring, filter honeypot candidates (risk ≥ 0.6), select top 100,
+  generate JD-aware reasoning referencing specific candidate facts.
+  No LLM calls, no GPU, no network access. All heuristic weights hand-tuned
+  from EDA on candidate distribution patterns.
+  Single-command reproduction: python -m src.inference
+
+# Model & Features
+model_description: >-
+  Sentence-Transformers (all-MiniLM-L6-v2, 22M params) for dense text
+  embeddings + 15 hand-engineered recruiter-domain feature functions
+  with weighted heuristic scoring fusion
+features_used:
+  - "semantic_similarity"
+  - "role_title_score"
+  - "product_company_score"
+  - "experience_band_match"
+  - "ml_years_estimate"
+  - "ai_skill_depth_score"
+  - "availability_score"
+  - "reliability_score"
+  - "github_fit_score"
+  - "geo_fit_score"
+  - "work_mode_fit"
+  - "notice_period_penalty"
+  - "honeypot_risk_score"
+external_data_used: false

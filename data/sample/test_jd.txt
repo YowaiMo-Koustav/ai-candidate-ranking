@@ -1,0 +1,20 @@
+Senior AI Engineer — Semantic Search & Ranking
+
+We are hiring an AI Engineer to build and maintain our candidate ranking system.
+
+Responsibilities:
+- Design and implement embedding-based retrieval pipelines using Sentence Transformers, FAISS, and pgvector
+- Build ranking models combining semantic similarity with structured candidate signals
+- Implement evaluation frameworks (NDCG, MAP, P@K) for ranking quality measurement
+- Collaborate with product team to integrate search into hiring platform
+
+Requirements:
+- 5-8 years of industry experience, at least 2 years in ML/AI roles
+- Strong experience with PyTorch or TensorFlow, NLP models
+- Familiarity with MLOps (model versioning, CI/CD for ML, experiment tracking)
+- Python, APIs, data pipelines expertise
+
+Nice to have:
+- Recommendation systems or learning-to-rank experience
+- OpenSearch / Elasticsearch knowledge
+- Open-source contributions in NLP/IR

@@ -259,13 +259,20 @@ ai-candidate-ranking/
 
 ## 📝 Submission Metadata
 
-Update `submission_metadata.yaml` before submitting:
+Current `submission_metadata.yaml` configuration:
 
 ```yaml
-team_name: "Your Team Name"
+team_name: "NPCsWithWifi"
 team_members:
-  - "Member 1"
-model_description: "Sentence-Transformers (all-MiniLM-L6-v2) + 15 hand-engineered recruiter-domain features with weighted heuristic scoring"
+  - name: "ANSHU RAJ"
+    role: "Leader"
+  - name: "KOUSTAV MALLICK"
+    role: "Member"
+  - name: "SOUMYADIP MANDAL"
+    role: "Member"
+model_description: >-
+  Sentence-Transformers (all-MiniLM-L6-v2) + 15 hand-engineered
+  recruiter-domain features with weighted heuristic scoring
 features_used:
   - "semantic_similarity"
   - "role_title_score"

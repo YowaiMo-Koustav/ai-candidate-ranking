@@ -122,7 +122,7 @@ def main():
         help="Path to precomputed tabular features parquet file.",
     )
     parser.add_argument(
-        "--out", type=str, default="outputs/submissions/ranked_candidates.csv",
+        "--out", type=str, default="outputs/submissions/team_NPCsWithWifi.csv",
         help="Path to save the final submission CSV.",
     )
 
